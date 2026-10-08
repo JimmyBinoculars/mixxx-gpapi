@@ -15,6 +15,15 @@ class VersionStore {
     /// Returns the current Mixxx version suffix (e.g. "beta")
     static QString versionSuffix();
 
+    /// Returns this fork's revision of the running Mixxx base (e.g. "gpapi.1").
+    static QString forkVersion();
+
+    /// Returns the plugin API major version implemented by this build.
+    static int pluginApiVersion();
+
+    /// Returns the oldest plugin API major version this build still loads.
+    static int pluginApiMinVersion();
+
     /// Returns the application name. (e.g. "Mixxx")
     static QString applicationName();
 

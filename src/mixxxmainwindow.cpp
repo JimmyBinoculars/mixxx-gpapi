@@ -41,6 +41,7 @@
 #include "library/trackcollectionmanager.h"
 #include "mixer/playerinfo.h"
 #include "mixer/playermanager.h"
+#include "plugins/pluginmanager.h"
 #include "recording/recordingmanager.h"
 #include "skin/legacy/launchimage.h"
 #include "skin/skinloader.h"
@@ -299,7 +300,8 @@ void MixxxMainWindow::initialize() {
             m_pCoreServices->getVinylControlManager(),
             m_pCoreServices->getEffectsManager(),
             m_pCoreServices->getSettingsManager(),
-            m_pCoreServices->getLibrary());
+            m_pCoreServices->getLibrary(),
+            m_pCoreServices->getPluginManager());
     m_pPrefDlg->setWindowIcon(QIcon(MIXXX_ICON_PATH));
     m_pPrefDlg->setHidden(true);
     connect(m_pPrefDlg,
@@ -434,6 +436,13 @@ void MixxxMainWindow::initialize() {
     if (CmdlineArgs::Instance().getStartAutoDJ()) {
         qDebug("Enabling Auto DJ from CLI flag.");
         ControlObject::set(ConfigKey("[AutoDJ]", "enabled"), 1.0);
+    }
+
+    // Plugins may have requested dock panels before the main window was
+    // available (their init() runs during CoreServices::initialize()). Hand
+    // the window over now so any pending panels materialize.
+    if (auto pPluginManager = m_pCoreServices->getPluginManager()) {
+        pPluginManager->setMainWindow(this);
     }
 }
 
@@ -781,7 +790,10 @@ void MixxxMainWindow::createMenuBar() {
     ScopedTimer t(u"MixxxMainWindow::createMenuBar");
     DEBUG_ASSERT(m_pCoreServices->getKeyboardConfig());
     m_pMenuBar = make_parented<WMainMenuBar>(
-            this, m_pCoreServices->getSettings(), m_pCoreServices->getKeyboardConfig().get());
+            this,
+            m_pCoreServices->getSettings(),
+            m_pCoreServices->getKeyboardConfig().get(),
+            m_pCoreServices->getPluginMenuRegistry().get());
     if (m_pCentralWidget) {
         m_pMenuBar->setStyleSheet(m_pCentralWidget->styleSheet());
     }
@@ -809,6 +821,11 @@ void MixxxMainWindow::connectMenuBar() {
             &WMainMenuBar::showPreferences,
             this,
             &MixxxMainWindow::slotOptionsPreferences,
+            Qt::UniqueConnection);
+    connect(m_pMenuBar,
+            &WMainMenuBar::showPluginsPreferences,
+            this,
+            &MixxxMainWindow::slotOptionsPlugins,
             Qt::UniqueConnection);
     connect(m_pMenuBar,
             &WMainMenuBar::loadTrackToDeck,
@@ -1038,7 +1055,8 @@ void MixxxMainWindow::slotDeveloperTools(bool visible) {
     if (visible) {
         if (m_pDeveloperToolsDlg == nullptr) {
             UserSettingsPointer pConfig = m_pCoreServices->getSettings();
-            m_pDeveloperToolsDlg = new DlgDeveloperTools(this, pConfig);
+            m_pDeveloperToolsDlg = new DlgDeveloperTools(
+                    this, pConfig, m_pCoreServices->getPluginManager().get());
             connect(m_pDeveloperToolsDlg,
                     &DlgDeveloperTools::destroyed,
                     this,
@@ -1082,6 +1100,16 @@ void MixxxMainWindow::slotOptionsPreferences() {
     m_pPrefDlg->show();
     m_pPrefDlg->raise();
     m_pPrefDlg->activateWindow();
+}
+
+void MixxxMainWindow::slotOptionsPlugins() {
+    if (m_pPrefDlg == nullptr) {
+        return;
+    }
+    m_pPrefDlg->show();
+    m_pPrefDlg->raise();
+    m_pPrefDlg->activateWindow();
+    m_pPrefDlg->showPluginsPage();
 }
 
 void MixxxMainWindow::slotNoVinylControlInputConfigured() {

@@ -1,5 +1,7 @@
 #include "util/dnd.h"
 
+#include <utility>
+
 #include "control/controlobject.h"
 #include "library/parser.h"
 #include "mixer/playermanager.h"
@@ -8,6 +10,8 @@
 #include "track/track.h"
 
 namespace {
+
+DragAndDropHelper::RemoteLocationDetector s_remoteLocationDetector;
 
 QDrag* dragUrls(
         const QList<QUrl>& trackUrls,
@@ -31,15 +35,20 @@ QDrag* dragUrls(
 
 bool addFileToList(
         mixxx::FileInfo fileInfo,
-        QList<mixxx::FileInfo>* fileInfos) {
-    if (!fileInfo.checkFileExists()) {
-        return false;
-    }
+        QList<mixxx::FileInfo>* fileInfos,
+        bool acceptRemote) {
+    const bool remote = acceptRemote &&
+            DragAndDropHelper::isRemoteLocation(fileInfo.location());
+    if (!remote) {
+        if (!fileInfo.checkFileExists()) {
+            return false;
+        }
 
-    // Filter out invalid URLs (eg. files that aren't supported audio
-    // filetypes, etc.)
-    if (!SoundSourceProxy::isFileSupported(fileInfo)) {
-        return false;
+        // Filter out invalid URLs (eg. files that aren't supported audio
+        // filetypes, etc.)
+        if (!SoundSourceProxy::isFileSupported(fileInfo)) {
+            return false;
+        }
     }
 
     fileInfos->append(std::move(fileInfo));
@@ -50,7 +59,8 @@ QList<mixxx::FileInfo> dropEventFiles(
         const QMimeData& mimeData,
         const QString& sourceIdentifier,
         bool firstOnly,
-        bool acceptPlaylists) {
+        bool acceptPlaylists,
+        bool acceptRemote) {
     qDebug() << "dropEventFiles()" << mimeData.hasUrls() << mimeData.urls();
     qDebug() << "mimeData.hasText()" << mimeData.hasText() << mimeData.text();
 
@@ -62,7 +72,8 @@ QList<mixxx::FileInfo> dropEventFiles(
     return DragAndDropHelper::supportedTracksFromUrls(
             mimeData.urls(),
             firstOnly,
-            acceptPlaylists);
+            acceptPlaylists,
+            acceptRemote);
 }
 
 // Allow loading to a player if the player isn't playing
@@ -137,10 +148,22 @@ bool mouseMoveInitiatesDragHelper(QMouseEvent* pEvent, bool isPress) {
 } // anonymous namespace
 
 //static
+void DragAndDropHelper::setRemoteLocationDetector(
+        RemoteLocationDetector detector) {
+    s_remoteLocationDetector = std::move(detector);
+}
+
+//static
+bool DragAndDropHelper::isRemoteLocation(const QString& location) {
+    return s_remoteLocationDetector && s_remoteLocationDetector(location);
+}
+
+//static
 QList<mixxx::FileInfo> DragAndDropHelper::supportedTracksFromUrls(
         const QList<QUrl>& urls,
         bool firstOnly,
-        bool acceptPlaylists) {
+        bool acceptPlaylists,
+        bool acceptRemote) {
     QList<mixxx::FileInfo> fileInfos;
     for (const QUrl& url : urls) {
         // XXX: Possible WTF alert - Previously we thought we needed
@@ -166,10 +189,10 @@ QList<mixxx::FileInfo> DragAndDropHelper::supportedTracksFromUrls(
         if (acceptPlaylists && Parser::isPlaylistFilenameSupported(file)) {
             const QList<QString> track_list = Parser::parse(file);
             for (const auto& playlistFile : track_list) {
-                addFileToList(mixxx::FileInfo(playlistFile), &fileInfos);
+                addFileToList(mixxx::FileInfo(playlistFile), &fileInfos, acceptRemote);
             }
         } else {
-            addFileToList(mixxx::FileInfo::fromQUrl(url), &fileInfos);
+            addFileToList(mixxx::FileInfo::fromQUrl(url), &fileInfos, acceptRemote);
         }
 
         if (firstOnly && !fileInfos.isEmpty()) {
@@ -225,10 +248,12 @@ bool DragAndDropHelper::dragEnterAccept(
         const QMimeData& mimeData,
         const QString& sourceIdentifier,
         bool firstOnly,
-        bool acceptPlaylists) {
+        bool acceptPlaylists,
+        bool acceptRemote) {
     // TODO(XXX): This operation blocks the UI when many
     // files are selected!
-    const auto files = dropEventFiles(mimeData, sourceIdentifier, firstOnly, acceptPlaylists);
+    const auto files = dropEventFiles(
+            mimeData, sourceIdentifier, firstOnly, acceptPlaylists, acceptRemote);
     return !files.isEmpty();
 }
 
@@ -260,7 +285,7 @@ void DragAndDropHelper::handleTrackDragEnterEvent(
         const QString& group,
         UserSettingsPointer pConfig) {
     if (allowLoadToPlayer(group, pConfig) &&
-            dragEnterAccept(*pEvent->mimeData(), group, true, false)) {
+            dragEnterAccept(*pEvent->mimeData(), group, true, false, true)) {
         pEvent->acceptProposedAction();
     } else {
         qDebug() << "Ignoring drag enter event, loading not allowed";
@@ -281,7 +306,7 @@ void DragAndDropHelper::handleTrackDropEvent(
             return;
         } else {
             const QList<mixxx::FileInfo> files = dropEventFiles(
-                    *pEvent->mimeData(), group, true, false);
+                    *pEvent->mimeData(), group, true, false, true);
             if (!files.isEmpty()) {
                 pEvent->accept();
                 target.emitTrackDropped(files.at(0).location(), group);

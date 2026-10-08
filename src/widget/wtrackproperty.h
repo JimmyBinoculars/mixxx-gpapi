@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QLineEdit>
+#include <QVariantMap>
 
 #include "preferences/usersettings.h"
 #include "track/track_decl.h"
@@ -68,6 +69,11 @@ class WTrackProperty : public WLabel, public TrackDropTarget {
     void slotTrackLoaded(TrackPointer pTrack);
     void slotLoadingTrack(TrackPointer pNewTrack, TrackPointer pOldTrack);
     void slotShowTrackMenuChangeRequest(bool show);
+    // Shows the known tags of a remote track while it is being downloaded,
+    // before any local file (and thus Track object) exists for this deck.
+    void slotRemoteDownloadStarted(
+            const QString& group, const QVariantMap& metadata);
+    void slotRemoteDownloadFinished(const QString& group);
 
   protected:
     void contextMenuEvent(QContextMenuEvent* event) override;
@@ -85,7 +91,8 @@ class WTrackProperty : public WLabel, public TrackDropTarget {
     void mouseDoubleClickEvent(QMouseEvent* event) override;
 
     void updateLabel();
-    const QString getPropertyStringFromTrack(QString& property) const;
+    QString getPropertyStringFromTrack(const QString& property) const;
+    QString getPropertyStringFromMetadata(const QString& property) const;
     void restyleAndRepaint();
 
     void ensureTrackMenuIsCreated();
@@ -94,6 +101,9 @@ class WTrackProperty : public WLabel, public TrackDropTarget {
     Library* m_pLibrary;
     const bool m_isMainDeck;
     TrackPointer m_pCurrentTrack;
+    // Known tags of a remote track that is currently being downloaded to this
+    // deck. Empty unless a remote download is pending.
+    QVariantMap m_pendingMetadata;
 
     QString m_displayProperty;
     QString m_editProperty;

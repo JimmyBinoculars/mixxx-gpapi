@@ -5,6 +5,7 @@
 #include <QList>
 #include <QMap>
 #include <QObject>
+#include <QVariantMap>
 
 #include "analyzer/trackanalysisscheduler.h"
 #include "engine/channelhandle.h"
@@ -111,6 +112,23 @@ class PlayerManager : public PlayerManagerInterface {
     // Get the deck by its index.
     Deck* getDeck(int deckIndex) const;
     BaseTrackPlayer* getDeckBase(int deckIndex) const override;
+
+    // Returns the group of the first stopped deck, or an empty string if all
+    // decks are playing. Used to show the pending download state of a remote
+    // (plugin) track on the deck that is about to receive it.
+    QString nextAvailableDeckGroup() const;
+
+    // Reports that a remote (plugin) track is being downloaded for `group`.
+    // `metadata` carries the track's known tags (title, artist, ...) so the
+    // deck can display them before the local file exists.
+    void reportRemoteTrackDownloadStarted(
+            const QString& group, const QVariantMap& metadata);
+    // Reports download byte progress for `group`. `total` may be <= 0 when the
+    // server does not provide a content length.
+    void reportRemoteTrackDownloadProgress(
+            const QString& group, qint64 received, qint64 total);
+    // Reports that the download for `group` has finished (successfully or not).
+    void reportRemoteTrackDownloadFinished(const QString& group);
 
     // Return the number of players. Thread-safe.
     int numberOfDecks() const override;
@@ -237,6 +255,14 @@ class PlayerManager : public PlayerManagerInterface {
 
     void trackAnalyzerProgress(TrackId trackId, AnalyzerProgress analyzerProgress);
     void trackAnalyzerIdle();
+
+    // Emitted while a remote (plugin) track is being downloaded for a deck.
+    // The matching remoteTrackDownloadFinished() clears the pending state.
+    void remoteTrackDownloadStarted(
+            const QString& group, const QVariantMap& metadata);
+    void remoteTrackDownloadProgress(
+            const QString& group, qint64 received, qint64 total);
+    void remoteTrackDownloadFinished(const QString& group);
 
   private:
     TrackPointer lookupTrack(QString location);

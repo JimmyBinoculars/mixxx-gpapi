@@ -63,6 +63,9 @@ WOverview::WOverview(
           m_b(0.0),
           m_analyzerProgress(kAnalyzerProgressUnknown),
           m_trackLoaded(false),
+          m_remoteDownloading(false),
+          m_remoteDownloadReceived(0),
+          m_remoteDownloadTotal(0),
           m_pHoveredMark(nullptr),
           m_scaleFactor(1.0),
           m_trackSampleRateControl(
@@ -114,6 +117,19 @@ WOverview::WOverview(
 
     connect(pPlayerManager, &PlayerManager::trackAnalyzerProgress,
             this, &WOverview::onTrackAnalyzerProgress);
+
+    connect(pPlayerManager,
+            &PlayerManager::remoteTrackDownloadStarted,
+            this,
+            &WOverview::onRemoteTrackDownloadStarted);
+    connect(pPlayerManager,
+            &PlayerManager::remoteTrackDownloadProgress,
+            this,
+            &WOverview::onRemoteTrackDownloadProgress);
+    connect(pPlayerManager,
+            &PlayerManager::remoteTrackDownloadFinished,
+            this,
+            &WOverview::onRemoteTrackDownloadFinished);
 
     connect(m_pCueMenuPopup.get(), &WCueMenuPopup::aboutToHide, this, &WOverview::slotCueMenuPopupAboutToHide);
 }
@@ -332,6 +348,43 @@ void WOverview::onTrackAnalyzerProgress(TrackId trackId, AnalyzerProgress analyz
     }
 }
 
+void WOverview::onRemoteTrackDownloadStarted(
+        const QString& group, const QVariantMap& metadata) {
+    // The overview only draws a generic hint; the track's tags are shown by
+    // WTrackProperty widgets, so the metadata is intentionally unused here.
+    Q_UNUSED(metadata);
+    if (group != m_group) {
+        return;
+    }
+    resetRemoteDownloadState();
+    m_remoteDownloading = true;
+    update();
+}
+
+void WOverview::onRemoteTrackDownloadProgress(
+        const QString& group, qint64 received, qint64 total) {
+    if (group != m_group) {
+        return;
+    }
+    m_remoteDownloadReceived = received;
+    m_remoteDownloadTotal = total;
+    update();
+}
+
+void WOverview::onRemoteTrackDownloadFinished(const QString& group) {
+    if (group != m_group) {
+        return;
+    }
+    resetRemoteDownloadState();
+    update();
+}
+
+void WOverview::resetRemoteDownloadState() {
+    m_remoteDownloading = false;
+    m_remoteDownloadReceived = 0;
+    m_remoteDownloadTotal = 0;
+}
+
 void WOverview::slotTrackLoaded(TrackPointer pTrack) {
     Q_UNUSED(pTrack); // only used in DEBUG_ASSERT
     //qDebug() << "WOverview::slotTrackLoaded()" << m_pCurrentTrack.get() << pTrack.get();
@@ -368,6 +421,8 @@ void WOverview::slotLoadingTrack(TrackPointer pNewTrack, TrackPointer pOldTrack)
     // signal has been received.
     m_trackLoaded = false;
     m_endOfTrack = false;
+    // A new (or ejected) track supersedes any pending remote download overlay.
+    resetRemoteDownloadState();
 
     if (pNewTrack) {
         m_pCurrentTrack = pNewTrack;
@@ -687,6 +742,8 @@ void WOverview::paintEvent(QPaintEvent* pEvent) {
         }
     }
 
+    drawRemoteDownloadOverlay(&painter);
+
     if (m_bPassthroughEnabled) {
         drawPassthroughOverlay(&painter);
         m_pPassthroughLabel->show();
@@ -835,6 +892,27 @@ void WOverview::drawAnalyzerProgress(QPainter* pPainter) {
         //: Text on waveform overview when file is cached from source
         paintText(tr("Loading track..."), pPainter);
     }
+}
+
+void WOverview::drawRemoteDownloadOverlay(QPainter* pPainter) {
+    if (!m_remoteDownloading) {
+        return;
+    }
+    QString text;
+    if (m_remoteDownloadTotal > 0) {
+        const int percent = qBound(0,
+                static_cast<int>((m_remoteDownloadReceived * 100) /
+                        m_remoteDownloadTotal),
+                100);
+        //: Text on the waveform overview while a remote track is being
+        //: downloaded; %1 is the percentage complete.
+        text = tr("Downloading... (%1%)").arg(percent);
+    } else {
+        //: Text on the waveform overview while a remote track is being
+        //: downloaded, when the total size is unknown.
+        text = tr("Downloading...");
+    }
+    paintText(text, pPainter);
 }
 
 void WOverview::drawRangeMarks(QPainter* pPainter, const float& offset, const float& gain) {

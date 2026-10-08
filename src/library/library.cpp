@@ -31,6 +31,8 @@
 #include "library/trackset/playlistfeature.h"
 #include "library/trackset/setlogfeature.h"
 #include "library/traktor/traktorfeature.h"
+#include "plugins/library/pluginremotelibraryfeature.h"
+#include "track/track.h"
 #include "mixer/playermanager.h"
 #include "moc_library.cpp"
 #include "util/assert.h"
@@ -67,13 +69,15 @@ Library::Library(
           m_pConfig(pConfig),
           m_pDbConnectionPool(std::move(pDbConnectionPool)),
           m_pTrackCollectionManager(pTrackCollectionManager),
+          m_pPlayerManager(pPlayerManager),
           m_pSidebarModel(make_parented<SidebarModel>(this)),
           m_pLibraryControl(make_parented<LibraryControl>(this)),
           m_pLibraryWidget(nullptr),
           m_pMixxxLibraryFeature(nullptr),
           m_pPlaylistFeature(nullptr),
           m_pCrateFeature(nullptr),
-          m_pAnalysisFeature(nullptr) {
+          m_pAnalysisFeature(nullptr),
+          m_pPluginRemoteLibraryFeature(nullptr) {
     qRegisterMetaType<LibraryRemovalType>("LibraryRemovalType");
 
     m_pKeyNotation.reset(
@@ -133,6 +137,10 @@ Library::Library(
             m_pBrowseFeature,
             &BrowseFeature::slotLibraryScanFinished);
     addFeature(m_pBrowseFeature);
+
+    m_pPluginRemoteLibraryFeature = new mixxx::plugins::PluginRemoteLibraryFeature(
+            this, m_pConfig);
+    addFeature(m_pPluginRemoteLibraryFeature);
 
     addFeature(new RecordingFeature(this, m_pConfig, pRecordingManager));
 
@@ -547,11 +555,26 @@ void Library::slotSwitchToView(const QString& view) {
     emit switchToView(view);
 }
 
+bool Library::isRemoteTrackLocation(const QString& location) const {
+    return m_pPluginRemoteLibraryFeature != nullptr &&
+            m_pPluginRemoteLibraryFeature->isRemoteLocation(location);
+}
+
 void Library::slotLoadTrack(TrackPointer pTrack) {
+    const QString location = pTrack != nullptr ? pTrack->getLocation() : QString();
+    if (isRemoteTrackLocation(location)) {
+        m_pPluginRemoteLibraryFeature->loadRemoteTrack(
+                location, QString(), false, true);
+        return;
+    }
     emit loadTrack(pTrack);
 }
 
 void Library::slotLoadLocationToPlayer(const QString& location, const QString& group, bool play) {
+    if (isRemoteTrackLocation(location)) {
+        m_pPluginRemoteLibraryFeature->loadRemoteTrack(location, group, play);
+        return;
+    }
     auto trackRef = TrackRef::fromFilePath(location);
     TrackPointer pTrack = m_pTrackCollectionManager->getOrAddTrack(trackRef);
     if (pTrack) {
@@ -561,6 +584,11 @@ void Library::slotLoadLocationToPlayer(const QString& location, const QString& g
 
 void Library::slotLoadTrackToPlayer(
         TrackPointer pTrack, const QString& group, bool play) {
+    const QString location = pTrack != nullptr ? pTrack->getLocation() : QString();
+    if (isRemoteTrackLocation(location)) {
+        m_pPluginRemoteLibraryFeature->loadRemoteTrack(location, group, play);
+        return;
+    }
     emit loadTrackToPlayer(pTrack, group, play);
 }
 
@@ -718,6 +746,13 @@ void Library::setRowHeight(int rowHeight) {
 void Library::setEditMetadataSelectedClick(bool enabled) {
     m_editMetadataSelectedClick = enabled;
     emit setSelectedClick(enabled);
+}
+
+void Library::setPluginRemoteSourceManager(
+        mixxx::plugins::RemoteSourceManager* pManager) {
+    if (m_pPluginRemoteLibraryFeature != nullptr) {
+        m_pPluginRemoteLibraryFeature->setRemoteSourceManager(pManager);
+    }
 }
 
 void Library::searchTracksInCollection(const QString& query) {

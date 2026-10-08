@@ -1,0 +1,11 @@
+{
+  "id": "org.mixxx.gain",
+  "name": "Example Gain",
+  "description": "Example native DSP plugin: a stereo gain stage with one parameter.",
+  "author": "Mixxx",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "runtime": "native",
+  "entry": { "native": "libgain.so" },
+  "capabilities": ["audio.graph"]
+}

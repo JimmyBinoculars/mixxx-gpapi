@@ -1,0 +1,36 @@
+BSD Zero Clause License (0BSD)
+SPDX-License-Identifier: 0BSD
+
+Copyright (c) 2026 The mixxx-gpapi authors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+
+
+SCOPE OF THIS LICENSE
+
+This 0BSD license applies to ONLY the following three Mixxx plugin SDK
+interface files, so that plugin authors may license their own plugins under
+whatever terms they choose:
+
+  * src/plugins/api/mixxx_plugin_abi.h
+  * docs/plugins/mixxx.d.ts
+  * docs/plugins/plugin.schema.json
+
+No other file is covered by this license. The remainder of the Mixxx source
+tree — including every other file under src/plugins/ — is distributed under
+the GNU General Public License v2.0 or later (GPL-2.0-or-later), as stated in
+the top-level LICENSE file.
+
+If you redistribute this fork, keep this file and the per-file
+SPDX-License-Identifier notices intact so the scope remains unambiguous. If
+you are the fork author and "The mixxx-gpapi authors" is not the correct
+copyright holder, replace it with the correct name/entity.

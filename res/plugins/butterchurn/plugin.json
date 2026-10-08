@@ -1,0 +1,11 @@
+{
+  "id": "org.mixxx.butterchurn",
+  "name": "Butterchurn Visualizer",
+  "description": "Bundled example script plugin. Opens a separate window rendering Milkdrop (Butterchurn) WebGL visuals driven by the master output.",
+  "author": "Mixxx",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "runtime": "script",
+  "entry": { "script": "main.js" },
+  "capabilities": ["ui.menu", "ui.panel", "ui.web", "audio.scope"]
+}

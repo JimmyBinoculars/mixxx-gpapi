@@ -1138,6 +1138,14 @@ QWidget* LegacySkinParser::parseTrackProperty(const QDomElement& node) {
             &BaseTrackPlayer::loadingTrack,
             pTrackProperty,
             &WTrackProperty::slotLoadingTrack);
+    connect(m_pPlayerManager,
+            &PlayerManager::remoteTrackDownloadStarted,
+            pTrackProperty,
+            &WTrackProperty::slotRemoteDownloadStarted);
+    connect(m_pPlayerManager,
+            &PlayerManager::remoteTrackDownloadFinished,
+            pTrackProperty,
+            &WTrackProperty::slotRemoteDownloadFinished);
     connect(pTrackProperty,
             &WTrackProperty::trackDropped,
             m_pPlayerManager,

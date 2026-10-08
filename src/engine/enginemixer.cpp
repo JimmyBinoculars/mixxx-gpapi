@@ -18,6 +18,7 @@
 #include "engine/sync/enginesync.h"
 #include "mixer/playermanager.h"
 #include "moc_enginemixer.cpp"
+#include "plugins/audio/audiograph.h"
 #include "preferences/usersettings.h"
 #include "util/defs.h"
 #include "util/sample.h"
@@ -36,6 +37,7 @@ EngineMixer::EngineMixer(
         bool bEnableSidechain)
         : m_pChannelHandleFactory(pChannelHandleFactory),
           m_pEngineEffectsManager(pEffectsManager->getEngineEffectsManager()),
+          m_pPluginAudioGraph(nullptr),
           m_mainGainOld(0.0),
           m_boothGainOld(0.0),
           m_headphoneMainGainOld(0.0),
@@ -847,6 +849,12 @@ void EngineMixer::applyMainEffects(int bufferSize) {
                 CSAMPLE_GAIN_ONE,
                 CSAMPLE_GAIN_ONE);
     }
+
+    // Plugins inserted at the master bus. The graph is real-time safe: it only
+    // reads an immutable snapshot and never allocates or locks.
+    if (m_pPluginAudioGraph != nullptr) {
+        m_pPluginAudioGraph->processInPlace(m_main.data(), bufferSize);
+    }
 }
 
 void EngineMixer::processHeadphones(
@@ -883,6 +891,10 @@ void EngineMixer::processHeadphones(
             headphoneGain,
             iBufferSize);
     m_headphoneGainOld = headphoneGain;
+}
+
+void EngineMixer::setPluginAudioGraph(mixxx::plugins::AudioGraph* pGraph) {
+    m_pPluginAudioGraph = pGraph;
 }
 
 void EngineMixer::addChannel(EngineChannel* pChannel) {
@@ -1008,6 +1020,14 @@ void EngineMixer::onOutputConnected(const AudioOutput& output) {
         break;
     default:
         break;
+    }
+
+    // The callback is guaranteed to be inactive here, so it is safe to
+    // (re)prepare plugin nodes on the main thread.
+    if (m_pPluginAudioGraph != nullptr) {
+        m_pPluginAudioGraph->updateRenderParameters(
+                mixxx::audio::SampleRate::fromDouble(m_pSampleRate->get()).toDouble(),
+                kMaxEngineFrames);
     }
 }
 

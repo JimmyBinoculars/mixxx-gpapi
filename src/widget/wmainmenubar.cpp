@@ -10,6 +10,7 @@
 #include "control/controlproxy.h"
 #include "defs_urls.h"
 #include "moc_wmainmenubar.cpp"
+#include "plugins/ui/pluginmenuregistry.h"
 #include "util/cmdlineargs.h"
 #include "util/desktophelper.h"
 #include "util/experiment.h"
@@ -74,13 +75,25 @@ QUrl documentationUrl(
 }
 }  // namespace
 
-WMainMenuBar::WMainMenuBar(QWidget* pParent, UserSettingsPointer pConfig,
-                           ConfigObject<ConfigValueKbd>* pKbdConfig)
+WMainMenuBar::WMainMenuBar(QWidget* pParent,
+        UserSettingsPointer pConfig,
+        ConfigObject<ConfigValueKbd>* pKbdConfig,
+        mixxx::plugins::PluginMenuRegistry* pPluginMenuRegistry)
         : QMenuBar(pParent),
           m_pConfig(pConfig),
-          m_pKbdConfig(pKbdConfig) {
+          m_pKbdConfig(pKbdConfig),
+          m_pPluginMenuRegistry(pPluginMenuRegistry),
+          m_pPluginsMenu(nullptr) {
     setObjectName(QStringLiteral("MainMenu"));
     initialize();
+}
+
+WMainMenuBar::~WMainMenuBar() {
+    if (m_pPluginMenuRegistry != nullptr) {
+        // Forget the QAction pointers owned by this menu bar before its menus
+        // are deleted. Ignored if a newer menu bar has already been attached.
+        m_pPluginMenuRegistry->detach(m_pPluginsMenu);
+    }
 }
 
 void WMainMenuBar::initialize() {
@@ -609,6 +622,36 @@ void WMainMenuBar::initialize() {
         addMenu(pDeveloperMenu);
     }
 
+    // PLUGINS MENU (populated by PluginMenuRegistry after the other menus exist)
+    m_pPluginsMenu = new QMenu(tr("&Plugins"), this);
+#ifndef __APPLE__
+    connectMenuToSlotShowMenuBar(m_pPluginsMenu);
+#endif
+    if (m_pPluginMenuRegistry != nullptr) {
+        QAction* pManagePlugins = m_pPluginsMenu->addAction(tr("Manage Plugins..."));
+        connect(pManagePlugins, &QAction::triggered, this, &WMainMenuBar::showPluginsPreferences);
+        QAction* pManageSeparator = m_pPluginsMenu->addSeparator();
+        // Always keep "Manage Plugins..." visible so the Plugins menu is never
+        // an empty dead popup and the plugin preferences stay reachable even
+        // when every plugin is disabled or fails to load. Only the separator
+        // is toggled, so it never trails the menu with no plugin items below.
+        auto updatePluginsMenuSeparator = [this, pManageSeparator]() {
+            const bool hasItems = m_pPluginMenuRegistry != nullptr &&
+                    !m_pPluginMenuRegistry->isEmpty();
+            pManageSeparator->setVisible(hasItems);
+        };
+        connect(m_pPluginMenuRegistry,
+                &mixxx::plugins::PluginMenuRegistry::itemAdded,
+                this,
+                [updatePluginsMenuSeparator](const QString&) { updatePluginsMenuSeparator(); });
+        connect(m_pPluginMenuRegistry,
+                &mixxx::plugins::PluginMenuRegistry::itemRemoved,
+                this,
+                [updatePluginsMenuSeparator](const QString&) { updatePluginsMenuSeparator(); });
+        updatePluginsMenuSeparator();
+    }
+    addMenu(m_pPluginsMenu);
+
     addSeparator();
 
     // HELP MENU
@@ -708,6 +751,16 @@ void WMainMenuBar::initialize() {
 
     pHelpMenu->addAction(pHelpAboutApp);
     addMenu(pHelpMenu);
+
+    if (m_pPluginMenuRegistry != nullptr) {
+        // All menus now exist: let plugins materialize their entries.
+        m_pPluginMenuRegistry->attach(m_pPluginsMenu,
+                pFileMenu,
+                pViewMenu,
+                pLibraryMenu,
+                pOptionsMenu,
+                pHelpMenu);
+    }
 
 #ifndef __APPLE__
     // Watch focus changes to hide the menubar as soon as all menus are closed,

@@ -716,6 +716,35 @@ void PlayerManager::slotLoadLocationIntoNextAvailableDeck(const QString& locatio
     slotLoadLocationToPlayer(location, pDeck->getGroup(), play);
 }
 
+QString PlayerManager::nextAvailableDeckGroup() const {
+    auto locker = lockMutex(&m_mutex);
+    BaseTrackPlayer* pDeck = findFirstStoppedPlayerInList(m_decks);
+    return pDeck != nullptr ? pDeck->getGroup() : QString();
+}
+
+void PlayerManager::reportRemoteTrackDownloadStarted(
+        const QString& group, const QVariantMap& metadata) {
+    if (group.isEmpty()) {
+        return;
+    }
+    emit remoteTrackDownloadStarted(group, metadata);
+}
+
+void PlayerManager::reportRemoteTrackDownloadProgress(
+        const QString& group, qint64 received, qint64 total) {
+    if (group.isEmpty()) {
+        return;
+    }
+    emit remoteTrackDownloadProgress(group, received, total);
+}
+
+void PlayerManager::reportRemoteTrackDownloadFinished(const QString& group) {
+    if (group.isEmpty()) {
+        return;
+    }
+    emit remoteTrackDownloadFinished(group);
+}
+
 void PlayerManager::slotLoadTrackIntoNextAvailableSampler(TrackPointer pTrack) {
     auto locker = lockMutex(&m_mutex);
     BaseTrackPlayer* pSampler = findFirstStoppedPlayerInList(m_samplers);

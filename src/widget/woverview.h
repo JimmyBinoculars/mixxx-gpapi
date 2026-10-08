@@ -3,6 +3,7 @@
 #include <QColor>
 #include <QList>
 #include <QPixmap>
+#include <QVariantMap>
 
 #include "analyzer/analyzerprogress.h"
 #include "track/track_decl.h"
@@ -45,6 +46,11 @@ class WOverview : public WWidget, public TrackDropTarget {
     void slotLoadingTrack(TrackPointer pNewTrack, TrackPointer pOldTrack);
     void onTrackAnalyzerProgress(TrackId trackId,
             AnalyzerProgress analyzerProgress);
+    void onRemoteTrackDownloadStarted(
+            const QString& group, const QVariantMap& metadata);
+    void onRemoteTrackDownloadProgress(
+            const QString& group, qint64 received, qint64 total);
+    void onRemoteTrackDownloadFinished(const QString& group);
 
   signals:
     void trackDropped(const QString& filename, const QString& group) override;
@@ -97,6 +103,8 @@ class WOverview : public WWidget, public TrackDropTarget {
     void drawPlayPosition(QPainter* pPainter);
     void drawEndOfTrackFrame(QPainter* pPainter);
     void drawAnalyzerProgress(QPainter* pPainter);
+    void drawRemoteDownloadOverlay(QPainter* pPainter);
+    void resetRemoteDownloadState();
     void drawRangeMarks(QPainter* pPainter, const float& offset, const float& gain);
     void drawMarks(QPainter* pPainter, const float offset, const float gain);
     void drawPickupPosition(QPainter* pPainter);
@@ -181,6 +189,11 @@ class WOverview : public WWidget, public TrackDropTarget {
 
     AnalyzerProgress m_analyzerProgress;
     bool m_trackLoaded;
+    // True while a remote (plugin) track is being downloaded for this deck.
+    bool m_remoteDownloading;
+    // Byte progress of the pending download; total <= 0 means unknown.
+    qint64 m_remoteDownloadReceived;
+    qint64 m_remoteDownloadTotal;
     WaveformMarkPointer m_pHoveredMark;
     double m_scaleFactor;
 

@@ -8,3 +8,9 @@
 #define MIXXX_VERSION_PATCH @CMAKE_PROJECT_VERSION_PATCH@
 #define MIXXX_VERSION_SUFFIX "@MIXXX_VERSION_PRERELEASE@"
 #define MIXXX_BUILD_FLAGS "@MIXXX_BUILD_FLAGS@"
+
+// Fork identity and plugin API versioning (see CMakeLists.txt). Defined here so
+// code can use them at the preprocessor stage.
+#define MIXXX_FORK_VERSION "@MIXXX_FORK_VERSION@"
+#define MIXXX_PLUGIN_API_VERSION @MIXXX_PLUGIN_API_VERSION@
+#define MIXXX_PLUGIN_API_MIN_VERSION @MIXXX_PLUGIN_API_MIN_VERSION@

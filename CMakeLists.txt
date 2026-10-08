@@ -165,6 +165,10 @@ include(CMakeDependentOption)
 option(QT6 "Build with Qt6" ON)
 cmake_dependent_option(QML "Build with QML" ON "QT6" OFF)
 option(QOPENGL "Use QOpenGLWindow based widget instead of QGLWidget" ON)
+# Embedded web panels for plugins (used by the bundled Butterchurn visualizer).
+# Requires Qt WebEngine; disabled with a warning when the component is not
+# found.
+option(WEBENGINE "Build plugin support for embedded web (WebEngine) panels" ON)
 
 if(QOPENGL)
   add_compile_definitions(MIXXX_USE_QOPENGL)
@@ -1070,6 +1074,22 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/network/jsonwebtask.cpp
   src/network/networktask.cpp
   src/network/webtask.cpp
+  src/plugins/audio/audiograph.cpp
+  src/plugins/audio/audioscopetap.cpp
+  src/plugins/audio/pluginnode.cpp
+  src/plugins/pluginconsentdialog.cpp
+  src/plugins/pluginmanager.cpp
+  src/plugins/pluginmanifest.cpp
+  src/plugins/pluginpermissions.cpp
+  src/plugins/pluginstore.cpp
+  src/plugins/library/remotesourcemanager.cpp
+  src/plugins/library/pluginremotelibraryfeature.cpp
+  src/plugins/library/pluginremotetrackmodel.cpp
+  src/plugins/script/pluginjsproxies.cpp
+  src/plugins/script/pluginscriptengine.cpp
+  src/plugins/script/processproxy.cpp
+  src/plugins/ui/pluginmenuregistry.cpp
+  src/plugins/ui/pluginpanel.cpp
   src/preferences/colorpaletteeditor.cpp
   src/preferences/colorpaletteeditor.cpp
   src/preferences/colorpaletteeditormodel.cpp
@@ -1099,6 +1119,8 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/preferences/dialog/dlgpreflibrarydlg.ui
   src/preferences/dialog/dlgprefmixer.cpp
   src/preferences/dialog/dlgprefmixerdlg.ui
+  src/preferences/dialog/dlgprefplugins.cpp
+  src/preferences/dialog/dlgprefpluginsdlg.ui
   src/preferences/dialog/dlgprefrecord.cpp
   src/preferences/dialog/dlgprefrecorddlg.ui
   src/preferences/dialog/dlgprefreplaygain.cpp
@@ -1924,6 +1946,22 @@ install(
     "${MIXXX_INSTALL_DATADIR}"
 )
 
+# Bundled example plugins
+install(
+  DIRECTORY
+    "${CMAKE_CURRENT_SOURCE_DIR}/res/plugins"
+  DESTINATION
+    "${MIXXX_INSTALL_DATADIR}"
+)
+
+# Example native (C ABI) plugin. Built and installed as a bundled plugin so the
+# native audio path can be exercised end-to-end.
+default_option(MIXXX_BUILD_EXAMPLE_PLUGINS "Build example native plugins" "ON")
+if(MIXXX_BUILD_EXAMPLE_PLUGINS)
+  add_subdirectory(examples/plugins/gain)
+  add_dependencies(mixxx gain)
+endif()
+
 # Translation files
 install(
   DIRECTORY
@@ -2196,6 +2234,12 @@ if(BUILD_TESTING)
     src/test/playcountertest.cpp
     src/test/playermanagertest.cpp
     src/test/playlisttest.cpp
+    src/test/pluginaudiograph_test.cpp
+    src/test/pluginaudioscopetap_test.cpp
+    src/test/pluginconsent_test.cpp
+    src/test/pluginmanifest_test.cpp
+    src/test/pluginpanel_test.cpp
+    src/test/pluginprocess_test.cpp
     src/test/portmidicontroller_test.cpp
     src/test/portmidienumeratortest.cpp
     src/test/queryutiltest.cpp
@@ -2331,9 +2375,27 @@ else()
    set(MIXXX_VERSION "${CMAKE_PROJECT_VERSION}-${MIXXX_VERSION_PRERELEASE}")
 endif()
 
+# Fork identity and plugin API versioning.
+#
+#   * MIXXX_VERSION (above) tracks the upstream Mixxx release this fork is based
+#     on.
+#   * MIXXX_FORK_REVISION identifies this fork's own release of that base; bump
+#     it whenever you publish an updated fork build.
+#   * MIXXX_PLUGIN_API_VERSION is the script/JS plugin contract. Bump it ONLY on
+#     a breaking change: renamed/removed API or changed semantics. Additive
+#     features are new capability strings and do NOT need an API bump.
+#   * MIXXX_PLUGIN_API_MIN_VERSION is the oldest API version this build still
+#     loads; raise it when you drop support for an old plugin API.
+set(MIXXX_FORK_NAME "gpapi" CACHE STRING "Short identifier for this fork")
+set(MIXXX_FORK_REVISION 1 CACHE STRING "Fork revision for the current Mixxx base")
+set(MIXXX_PLUGIN_API_VERSION 1 CACHE STRING "Plugin API major version (breaking-change counter)")
+set(MIXXX_PLUGIN_API_MIN_VERSION 1 CACHE STRING "Oldest plugin API version this build still loads")
+set(MIXXX_FORK_VERSION "${MIXXX_FORK_NAME}.${MIXXX_FORK_REVISION}")
+
 get_target_property(MIXXX_BUILD_FLAGS mixxx-lib COMPILE_OPTIONS)
 
-# uses CMAKE_PROJECT_VERSION MIXXX_VERSION_PRERELEASE MIXXX_BUILD_FLAGS
+# uses CMAKE_PROJECT_VERSION MIXXX_VERSION_PRERELEASE MIXXX_BUILD_FLAGS and the
+# fork/plugin-API values defined above
 configure_file(src/version.h.in src/version.h @ONLY)
 
 if(GIT_COMMIT_DATE AND NOT GIT_COMMIT_DATE MATCHES "^[0-9]*-[0-9]*-[0-9]*T[0-9]*\\:[0-9]*\\:[0-9]*[+-][0-9]*\\:[0-9]*$")
@@ -2839,6 +2901,31 @@ if(QML)
     # From Qt 6.8 integrated in Qml via QmlMeta
     list(APPEND QT_EXTRA_COMPONENTS "QmlWorkerScript")
   endif()
+endif()
+set(MIXXX_WEBENGINE_AVAILABLE OFF)
+if(WEBENGINE)
+  find_package(Qt${QT_VERSION_MAJOR} COMPONENTS WebEngineWidgets WebChannel QUIET)
+  if(Qt${QT_VERSION_MAJOR}WebEngineWidgets_FOUND)
+    set(MIXXX_WEBENGINE_AVAILABLE ON)
+    list(APPEND QT_EXTRA_COMPONENTS "WebEngineWidgets")
+    list(APPEND QT_EXTRA_COMPONENTS "WebChannel")
+    # The web panel implementation is only compiled when WebEngine exists. The
+    # MIXXX_USE_WEBENGINE definition is scoped to main.cpp so that enabling the
+    # option does not change the compile command (and therefore invalidate the
+    # object files) of every other translation unit.
+    target_sources(mixxx-lib PRIVATE src/plugins/ui/pluginwebview.cpp)
+    set_source_files_properties(src/main.cpp
+        PROPERTIES COMPILE_DEFINITIONS "MIXXX_USE_WEBENGINE")
+  else()
+    message(WARNING
+      "Qt WebEngine was not found: plugin web panels (e.g. the bundled "
+      "Butterchurn visualizer) will be disabled. Install qt6-webengine-dev "
+      "(or your platform's equivalent) and reconfigure, or configure with "
+      "-DWEBENGINE=OFF to silence this warning.")
+  endif()
+endif()
+if(NOT MIXXX_WEBENGINE_AVAILABLE)
+  target_sources(mixxx-lib PRIVATE src/plugins/ui/pluginwebview_stub.cpp)
 endif()
 find_package(Qt${QT_VERSION_MAJOR}
   COMPONENTS

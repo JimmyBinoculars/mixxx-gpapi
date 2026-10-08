@@ -24,6 +24,9 @@
 #include "mixer/playerinfo.h"
 #include "mixer/playermanager.h"
 #include "moc_coreservices.cpp"
+#include "plugins/audio/audiograph.h"
+#include "plugins/pluginmanager.h"
+#include "plugins/ui/pluginmenuregistry.h"
 #include "preferences/dialog/dlgpreferences.h"
 #include "preferences/settingsmanager.h"
 #ifdef __MODPLUG__
@@ -341,6 +344,10 @@ CoreServices::CoreServices(const CmdlineArgs& args, QApplication* pApp)
     m_runtime_timer.start();
     mixxx::Time::start();
     ScopedTimer t(u"CoreServices::CoreServices");
+    // The menu registry and audio graph must exist before the GUI and the
+    // engine are created, so they are built here rather than in initialize().
+    m_pPluginMenuRegistry = std::make_shared<plugins::PluginMenuRegistry>();
+    m_pPluginAudioGraph = std::make_shared<plugins::AudioGraph>();
     // All this here is running without without start up screen
     // Defer long initializations to CoreServices::initialize() which is
     // called after the GUI is initialized
@@ -494,6 +501,8 @@ void CoreServices::initialize(QApplication* pApp) {
             m_pEffectsManager.get(),
             pChannelHandleFactory,
             true);
+    // Insert the plugin audio graph at the master bus.
+    m_pEngine->setPluginAudioGraph(m_pPluginAudioGraph.get());
 
     emit initializationProgressUpdate(30, tr("audio interface"));
     // Although m_pSoundManager is created here, m_pSoundManager->setupDevices()
@@ -676,6 +685,18 @@ void CoreServices::initialize(QApplication* pApp) {
         }
     }
 
+    // General-purpose plugins are loaded last, after all services they may
+    // depend on (library, players, effects, controllers) have been created.
+    plugins::PluginHost pluginHost;
+    pluginHost.pConfig = pConfig;
+    pluginHost.pPlayerManager = m_pPlayerManager;
+    pluginHost.pLibrary = m_pLibrary;
+    pluginHost.pTrackCollectionManager = m_pTrackCollectionManager;
+    pluginHost.pMenuRegistry = m_pPluginMenuRegistry.get();
+    pluginHost.pAudioGraph = m_pPluginAudioGraph.get();
+    m_pPluginManager = std::make_shared<plugins::PluginManager>(pluginHost);
+    m_pPluginManager->loadAll();
+
     m_isInitialized = true;
 }
 
@@ -771,7 +792,8 @@ std::shared_ptr<QDialog> CoreServices::makeDlgPreferences() const {
             getVinylControlManager(),
             getEffectsManager(),
             getSettingsManager(),
-            getLibrary());
+            getLibrary(),
+            getPluginManager());
     return pDlgPreferences;
 }
 
@@ -791,6 +813,11 @@ void CoreServices::finalize() {
 
     qDebug() << t.elapsed(false).debugMillisWithUnit() << "saving configuration";
     m_pSettingsManager->save();
+
+    // Plugins depend on the library, players and the audio graph, so shut
+    // them down before any of those services is destroyed.
+    qDebug() << t.elapsed(false).debugMillisWithUnit() << "deleting PluginManager";
+    m_pPluginManager.reset();
 
     // SoundManager depend on Engine and Config
     qDebug() << t.elapsed(false).debugMillisWithUnit() << "deleting SoundManager";

@@ -29,6 +29,12 @@ class ControlIndicatorTimer;
 class DbConnectionPool;
 class ScreensaverManager;
 
+namespace plugins {
+class AudioGraph;
+class PluginManager;
+class PluginMenuRegistry;
+} // namespace plugins
+
 class CoreServices : public QObject {
     Q_OBJECT
 
@@ -101,6 +107,14 @@ class CoreServices : public QObject {
         return m_pScreensaverManager;
     }
 
+    std::shared_ptr<plugins::PluginManager> getPluginManager() const {
+        return m_pPluginManager;
+    }
+
+    std::shared_ptr<plugins::PluginMenuRegistry> getPluginMenuRegistry() const {
+        return m_pPluginMenuRegistry;
+    }
+
     std::shared_ptr<QDialog> makeDlgPreferences() const;
 
   signals:
@@ -142,6 +156,10 @@ class CoreServices : public QObject {
     std::shared_ptr<ConfigObject<ConfigValueKbd>> m_pKbdConfigEmpty;
 
     std::shared_ptr<mixxx::ScreensaverManager> m_pScreensaverManager;
+
+    std::shared_ptr<plugins::PluginMenuRegistry> m_pPluginMenuRegistry;
+    std::shared_ptr<plugins::AudioGraph> m_pPluginAudioGraph;
+    std::shared_ptr<plugins::PluginManager> m_pPluginManager;
 
     std::unique_ptr<SkinControls> m_pSkinControls;
     std::unique_ptr<ControlPushButton> m_pTouchShift;

@@ -33,6 +33,9 @@ const QVersionNumber kMixxxVersionNumber = QVersionNumber(
 const QString kMixxxVersionSuffix = QString(MIXXX_VERSION_SUFFIX);
 const QString kMixxx = QStringLiteral("Mixxx");
 const QString kBuildFlags = QString(MIXXX_BUILD_FLAGS);
+const QString kForkVersion = QString(MIXXX_FORK_VERSION);
+const int kPluginApiVersion = MIXXX_PLUGIN_API_VERSION;
+const int kPluginApiMinVersion = MIXXX_PLUGIN_API_MIN_VERSION;
 
 } // namespace
 
@@ -53,6 +56,21 @@ QVersionNumber VersionStore::versionNumber() {
 // static
 QString VersionStore::versionSuffix() {
     return kMixxxVersionSuffix;
+}
+
+// static
+QString VersionStore::forkVersion() {
+    return kForkVersion;
+}
+
+// static
+int VersionStore::pluginApiVersion() {
+    return kPluginApiVersion;
+}
+
+// static
+int VersionStore::pluginApiMinVersion() {
+    return kPluginApiMinVersion;
 }
 
 QDateTime VersionStore::date() {
@@ -223,6 +241,9 @@ void VersionStore::logBuildDetails() {
 
     // This is the first line in mixxx.log
     qDebug().noquote() << applicationName() << version << buildInfoFormatted << "is starting...";
+    qDebug().noquote() << "Fork revision:" << forkVersion()
+                       << "Plugin API version:" << pluginApiVersion()
+                       << "(min supported" << pluginApiMinVersion() << ")";
 
     QStringList depVersions = dependencyVersions();
     qDebug() << "Compile time library versions:";

@@ -88,6 +88,8 @@ void WTrackProperty::slotLoadingTrack(TrackPointer pNewTrack, TrackPointer pOldT
         disconnect(m_pCurrentTrack.get(), nullptr, this, nullptr);
     }
     m_pCurrentTrack.reset();
+    // A newly loading track supersedes any pending remote-download tags.
+    m_pendingMetadata.clear();
     if (m_pEditor && m_pEditor->hasFocus()) {
         m_pEditor->hide();
     }
@@ -104,10 +106,47 @@ void WTrackProperty::updateLabel() {
         setText(getPropertyStringFromTrack(m_displayProperty));
         return;
     }
+    if (!m_pendingMetadata.isEmpty()) {
+        setText(getPropertyStringFromMetadata(m_displayProperty));
+        return;
+    }
     setText("");
 }
 
-const QString WTrackProperty::getPropertyStringFromTrack(QString& property) const {
+void WTrackProperty::slotRemoteDownloadStarted(
+        const QString& group, const QVariantMap& metadata) {
+    if (group != m_group) {
+        return;
+    }
+    m_pendingMetadata = metadata;
+    updateLabel();
+}
+
+void WTrackProperty::slotRemoteDownloadFinished(const QString& group) {
+    if (group != m_group) {
+        return;
+    }
+    m_pendingMetadata.clear();
+    updateLabel();
+}
+
+QString WTrackProperty::getPropertyStringFromMetadata(
+        const QString& property) const {
+    if (property.isEmpty() || m_pendingMetadata.isEmpty()) {
+        return {};
+    }
+    // `titleInfo` is the display-only variant of the `title` property.
+    const QString key = property == QLatin1String("titleInfo")
+            ? QStringLiteral("title")
+            : property;
+    const QVariant value = m_pendingMetadata.value(key);
+    if (value.isValid() && value.canConvert<QString>()) {
+        return value.toString();
+    }
+    return {};
+}
+
+QString WTrackProperty::getPropertyStringFromTrack(const QString& property) const {
     if (property.isEmpty() || !m_pCurrentTrack) {
         return {};
     }

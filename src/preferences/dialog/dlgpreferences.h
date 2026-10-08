@@ -23,6 +23,9 @@ class DlgPrefControllers;
 
 namespace mixxx {
 class ScreensaverManager;
+namespace plugins {
+class PluginManager;
+} // namespace plugins
 namespace skin {
 class SkinLoader;
 } // namespace skin
@@ -51,7 +54,8 @@ class DlgPreferences : public QDialog, public Ui::DlgPreferencesDlg {
             std::shared_ptr<VinylControlManager> pVCManager,
             std::shared_ptr<EffectsManager> pEffectsManager,
             std::shared_ptr<SettingsManager> pSettingsManager,
-            std::shared_ptr<Library> pLibrary);
+            std::shared_ptr<Library> pLibrary,
+            std::shared_ptr<mixxx::plugins::PluginManager> pPluginManager);
     virtual ~DlgPreferences();
 
     void addPageWidget(PreferencesPage page,
@@ -64,6 +68,7 @@ class DlgPreferences : public QDialog, public Ui::DlgPreferencesDlg {
   public slots:
     void changePage(QTreeWidgetItem* pCurrent, QTreeWidgetItem* pPrevious);
     void showSoundHardwarePage();
+    void showPluginsPage();
     void slotButtonPressed(QAbstractButton* pButton);
   signals:
     void closeDlg();
@@ -99,6 +104,7 @@ class DlgPreferences : public QDialog, public Ui::DlgPreferencesDlg {
     QStringList m_geometry;
     UserSettingsPointer m_pConfig;
     PreferencesPage m_soundPage;
+    PreferencesPage m_pluginsPage{nullptr, nullptr};
     DlgPrefControllers* m_pControllersDlg;
 
     QSize m_pageSizeHint;

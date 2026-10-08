@@ -179,7 +179,9 @@ int main(int argc, char * argv[]) {
     QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
     QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
 #endif
-#ifdef MIXXX_USE_QOPENGL
+#if defined(MIXXX_USE_QOPENGL) || defined(MIXXX_USE_WEBENGINE)
+    // Qt WebEngine also needs shared GL contexts so its Chromium compositor
+    // can coexist with Mixxx's QOpenGLWidget-based renderers.
     QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
 #endif
 

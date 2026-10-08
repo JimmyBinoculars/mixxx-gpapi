@@ -7,6 +7,7 @@
 #include <QListWidget>
 #include <QModelIndex>
 #include <QVBoxLayout>
+#include <utility>
 
 #include "analyzer/analyzerscheduledtrack.h"
 #include "analyzer/analyzersilence.h"
@@ -31,6 +32,7 @@
 #include "mixer/playerinfo.h"
 #include "mixer/playermanager.h"
 #include "moc_wtrackmenu.cpp"
+#include "plugins/library/pluginremotetrackmodel.h"
 #include "preferences/colorpalettesettings.h"
 #include "preferences/configobject.h"
 #include "preferences/dialog/dlgprefdeck.h"
@@ -1159,6 +1161,26 @@ void WTrackMenu::updateMenus() {
     }
 }
 
+void WTrackMenu::updatePluginActions() {
+    for (QAction* pAction : std::as_const(m_pluginActions)) {
+        removeAction(pAction);
+        pAction->deleteLater();
+    }
+    m_pluginActions.clear();
+
+    auto* pRemoteModel =
+            dynamic_cast<mixxx::plugins::PluginRemoteTrackModel*>(m_pTrackModel);
+    if (pRemoteModel == nullptr) {
+        return;
+    }
+    const int before = actions().size();
+    pRemoteModel->addContextMenuActions(this, m_trackIndexList);
+    const QList<QAction*> allActions = actions();
+    for (int i = before; i < allActions.size(); ++i) {
+        m_pluginActions.append(allActions[i]);
+    }
+}
+
 void WTrackMenu::loadTrack(
         const TrackPointer& pTrack, const QString& deckGroup) {
     // This asserts that this function is only accessible when a track model is not set,
@@ -1193,6 +1215,7 @@ void WTrackMenu::loadTrackModelIndices(
 
     m_trackIndexList = trackIndexList;
     updateMenus();
+    updatePluginActions();
 }
 
 TrackIdList WTrackMenu::getTrackIds() const {

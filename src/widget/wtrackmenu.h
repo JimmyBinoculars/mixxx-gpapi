@@ -217,6 +217,8 @@ class WTrackMenu : public QMenu {
     void createActions();
     void setupActions();
     void updateMenus();
+    /// Adds/removes the remote-source actions contributed by plugins.
+    void updatePluginActions();
 
     bool featureIsEnabled(Feature flag) const;
 
@@ -247,6 +249,8 @@ class WTrackMenu : public QMenu {
 
     TrackModel* const m_pTrackModel;
     QModelIndexList m_trackIndexList;
+    /// Actions added for plugin remote-library tracks (owned by this menu).
+    QList<QAction*> m_pluginActions;
 
     /// Track being referenced when TrackModel is not set.
     TrackPointer m_pTrack;

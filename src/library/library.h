@@ -34,6 +34,13 @@ class WLibrarySidebar;
 class WLibrary;
 class QAbstractItemModel;
 
+namespace mixxx {
+namespace plugins {
+class PluginRemoteLibraryFeature;
+class RemoteSourceManager;
+} // namespace plugins
+} // namespace mixxx
+
 #ifdef __ENGINEPRIME__
 namespace mixxx {
 class LibraryExporter;
@@ -61,6 +68,11 @@ class Library: public QObject {
     }
 
     TrackCollectionManager* trackCollectionManager() const;
+
+    /// The PlayerManager this library is bound to. May be nullptr in tests.
+    PlayerManager* playerManager() const {
+        return m_pPlayerManager;
+    }
 
     TrackAnalysisScheduler::Pointer createTrackAnalysisScheduler(
             int numWorkerThreads,
@@ -97,6 +109,11 @@ class Library: public QObject {
     void setFont(const QFont& font);
     void setRowHeight(int rowHeight);
     void setEditMetadataSelectedClick(bool enable);
+
+    /// Binds the plugin remote-source registry so plugin-contributed online
+    /// music sources appear in the library. Called once by PluginManager.
+    void setPluginRemoteSourceManager(
+            mixxx::plugins::RemoteSourceManager* pManager);
 
     /// Triggers a new search in the internal track collection
     /// and shows the results by switching the view.
@@ -155,12 +172,18 @@ class Library: public QObject {
       void onPlayerManagerTrackAnalyzerIdle();
 
   private:
+    /// True if `location` was produced by the plugin-contributed remote
+    /// library and must be resolved/downloaded before it can be loaded.
+    bool isRemoteTrackLocation(const QString& location) const;
+
     const UserSettingsPointer m_pConfig;
 
     // The Mixxx database connection pool
     const mixxx::DbConnectionPoolPtr m_pDbConnectionPool;
 
     const QPointer<TrackCollectionManager> m_pTrackCollectionManager;
+
+    PlayerManager* const m_pPlayerManager;
 
     parented_ptr<SidebarModel> m_pSidebarModel;
     parented_ptr<LibraryControl> m_pLibraryControl;
@@ -174,6 +197,7 @@ class Library: public QObject {
     CrateFeature* m_pCrateFeature;
     AnalysisFeature* m_pAnalysisFeature;
     BrowseFeature* m_pBrowseFeature;
+    mixxx::plugins::PluginRemoteLibraryFeature* m_pPluginRemoteLibraryFeature;
     QFont m_trackTableFont;
     int m_iTrackTableRowHeight;
     bool m_editMetadataSelectedClick;

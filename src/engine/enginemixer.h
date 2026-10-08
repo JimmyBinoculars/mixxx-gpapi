@@ -28,6 +28,12 @@ class EngineSync;
 class EngineTalkoverDucking;
 class EngineDelay;
 
+namespace mixxx {
+namespace plugins {
+class AudioGraph;
+} // namespace plugins
+} // namespace mixxx
+
 // The number of channels to pre-allocate in various structures in the
 // engine. Prevents memory allocation in EngineMixer::addChannel.
 static constexpr int kPreallocatedChannels = 64;
@@ -69,6 +75,11 @@ class EngineMixer : public QObject, public AudioSource {
     // Add an EngineChannel to the mixing engine. This is not thread safe --
     // only call it before the engine has started mixing.
     void addChannel(EngineChannel* pChannel);
+
+    // Sets the plugin audio graph inserted post-effects on the master bus.
+    // Must be called before the engine starts mixing. The graph is owned by
+    // CoreServices, not by EngineMixer.
+    void setPluginAudioGraph(mixxx::plugins::AudioGraph* pGraph);
     EngineChannel* getChannel(const QString& group);
     static inline CSAMPLE_GAIN gainForOrientation(EngineChannel::ChannelOrientation orientation,
             CSAMPLE_GAIN leftGain,
@@ -262,6 +273,8 @@ class EngineMixer : public QObject, public AudioSource {
     bool sidechainMixRequired() const;
 
     EngineEffectsManager* m_pEngineEffectsManager;
+
+    mixxx::plugins::AudioGraph* m_pPluginAudioGraph;
 
     // List of channels added to the engine.
     QVarLengthArray<ChannelInfo*, kPreallocatedChannels> m_channels;

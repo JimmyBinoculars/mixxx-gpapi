@@ -162,6 +162,41 @@ p, li { white-space: pre-wrap; }
        </item>
       </layout>
      </widget>
+     <widget class="QWidget" name="consoleTab">
+      <attribute name="title">
+       <string>Console</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="consoleLayout">
+       <item>
+        <widget class="QPlainTextEdit" name="consoleOutput">
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+         <property name="lineWrapMode">
+          <enum>QPlainTextEdit::NoWrap</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="consoleInputLayout">
+         <item>
+          <widget class="QLineEdit" name="consoleInput">
+           <property name="placeholderText">
+            <string>Evaluate JavaScript with the full mixxx API (&gt;)</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="consoleRun">
+           <property name="text">
+            <string>Run</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
     </widget>
    </item>
   </layout>

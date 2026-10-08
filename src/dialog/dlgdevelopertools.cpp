@@ -2,16 +2,24 @@
 
 #include <QDateTime>
 #include <QDir>
+#include <QJSValue>
+#include <QKeyEvent>
+#include <QPlainTextEdit>
+#include <QPushButton>
 
 #include "control/control.h"
 #include "moc_dlgdevelopertools.cpp"
+#include "plugins/pluginmanager.h"
 #include "util/logging.h"
 #include "util/statsmanager.h"
 
 DlgDeveloperTools::DlgDeveloperTools(QWidget* pParent,
-                                     UserSettingsPointer pConfig)
+                                     UserSettingsPointer pConfig,
+                                     mixxx::plugins::PluginManager* pPluginManager)
         : QDialog(pParent),
-          m_pConfig(pConfig) {
+          m_pConfig(pConfig),
+          m_pPluginManager(pPluginManager),
+          m_consoleHistoryIndex(0) {
     setupUi(this);
 
     controlsTable->setModel(&m_controlProxyModel);
@@ -61,6 +69,24 @@ DlgDeveloperTools::DlgDeveloperTools(QWidget* pParent,
 
     m_logCursor = logTextView->textCursor();
 
+    // Set up the plugin API console (REPL).
+    connect(consoleInput,
+            &QLineEdit::returnPressed,
+            this,
+            &DlgDeveloperTools::slotConsoleRun);
+    connect(consoleRun,
+            &QPushButton::clicked,
+            this,
+            &DlgDeveloperTools::slotConsoleRun);
+    consoleInput->installEventFilter(this);
+    if (m_pPluginManager == nullptr) {
+        consoleInput->setEnabled(false);
+        consoleRun->setEnabled(false);
+    } else {
+        appendConsole(tr("Mixxx plugin console. Try: "
+                         "mixxx.controls.get(\"[Channel1]\", \"play\")"));
+    }
+
     // Update at 2FPS.
     startTimer(500);
 
@@ -101,6 +127,31 @@ void DlgDeveloperTools::timerEvent(QTimerEvent* pEvent) {
             pManager->updateStats();
         }
     }
+}
+
+bool DlgDeveloperTools::eventFilter(QObject* pObject, QEvent* pEvent) {
+    if (pObject == consoleInput && pEvent->type() == QEvent::KeyPress) {
+        auto* pKeyEvent = static_cast<QKeyEvent*>(pEvent);
+        if (pKeyEvent->key() == Qt::Key_Up) {
+            if (m_consoleHistoryIndex > 0) {
+                --m_consoleHistoryIndex;
+                consoleInput->setText(m_consoleHistory.at(m_consoleHistoryIndex));
+            }
+            return true;
+        }
+        if (pKeyEvent->key() == Qt::Key_Down) {
+            const int historySize = static_cast<int>(m_consoleHistory.size());
+            if (m_consoleHistoryIndex < historySize - 1) {
+                ++m_consoleHistoryIndex;
+                consoleInput->setText(m_consoleHistory.at(m_consoleHistoryIndex));
+            } else if (m_consoleHistoryIndex < historySize) {
+                m_consoleHistoryIndex = historySize;
+                consoleInput->clear();
+            }
+            return true;
+        }
+    }
+    return QDialog::eventFilter(pObject, pEvent);
 }
 
 void DlgDeveloperTools::slotControlSearch(const QString& search) {
@@ -144,4 +195,33 @@ void DlgDeveloperTools::slotLogSearch() {
     QString textToFind = logSearch->text();
     m_logCursor = logTextView->document()->find(textToFind, m_logCursor);
     logTextView->setTextCursor(m_logCursor);
+}
+
+void DlgDeveloperTools::appendConsole(const QString& text) {
+    consoleOutput->appendPlainText(text);
+}
+
+void DlgDeveloperTools::slotConsoleRun() {
+    if (m_pPluginManager == nullptr) {
+        return;
+    }
+    const QString code = consoleInput->text();
+    consoleInput->clear();
+    if (code.trimmed().isEmpty()) {
+        return;
+    }
+
+    m_consoleHistory.append(code);
+    m_consoleHistoryIndex = static_cast<int>(m_consoleHistory.size());
+
+    appendConsole(QStringLiteral("> ") + code);
+    QJSValue result;
+    const bool ok = m_pPluginManager->evaluateRepl(code, &result);
+    if (!ok) {
+        appendConsole(QStringLiteral("Error: ") + result.toString());
+        return;
+    }
+    if (!result.isUndefined()) {
+        appendConsole(result.toString());
+    }
 }

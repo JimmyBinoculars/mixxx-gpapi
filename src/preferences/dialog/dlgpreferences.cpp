@@ -22,8 +22,10 @@
 #include "preferences/dialog/dlgprefvinyl.h"
 #endif // __VINYLCONTROL__
 
+#include "plugins/pluginmanager.h"
 #include "preferences/dialog/dlgprefautodj.h"
 #include "preferences/dialog/dlgprefcolors.h"
+#include "preferences/dialog/dlgprefplugins.h"
 #include "preferences/dialog/dlgprefdeck.h"
 #include "preferences/dialog/dlgprefeffects.h"
 #include "preferences/dialog/dlgprefinterface.h"
@@ -55,7 +57,8 @@ DlgPreferences::DlgPreferences(
         std::shared_ptr<VinylControlManager> pVCManager,
         std::shared_ptr<EffectsManager> pEffectsManager,
         std::shared_ptr<SettingsManager> pSettingsManager,
-        std::shared_ptr<Library> pLibrary)
+        std::shared_ptr<Library> pLibrary,
+        std::shared_ptr<mixxx::plugins::PluginManager> pPluginManager)
         : m_allPages(),
           m_pConfig(pSettingsManager->settings()),
           m_pageSizeHint(QSize(0, 0)) {
@@ -236,6 +239,15 @@ DlgPreferences::DlgPreferences(
             "ic_preferences_modplug.svg");
 #endif // __MODPLUG__
 
+    if (pPluginManager) {
+        m_pluginsPage = PreferencesPage(
+                new DlgPrefPlugins(this, pPluginManager.get()),
+                new QTreeWidgetItem(contentsTreeWidget, QTreeWidgetItem::Type));
+        addPageWidget(m_pluginsPage,
+                tr("Plugins"),
+                "ic_preferences_lv2.svg");
+    }
+
     // Find accept and apply buttons
     const auto buttons = buttonBox->buttons();
     for (QAbstractButton* button : buttons) {
@@ -304,6 +316,14 @@ void DlgPreferences::changePage(QTreeWidgetItem* pCurrent, QTreeWidgetItem* pPre
 void DlgPreferences::showSoundHardwarePage() {
     switchToPage(m_soundPage.pTreeItem->text(0), m_soundPage.pDlg);
     contentsTreeWidget->setCurrentItem(m_soundPage.pTreeItem);
+}
+
+void DlgPreferences::showPluginsPage() {
+    if (m_pluginsPage.pDlg == nullptr) {
+        return;
+    }
+    switchToPage(m_pluginsPage.pTreeItem->text(0), m_pluginsPage.pDlg);
+    contentsTreeWidget->setCurrentItem(m_pluginsPage.pTreeItem);
 }
 
 bool DlgPreferences::eventFilter(QObject* o, QEvent* e) {

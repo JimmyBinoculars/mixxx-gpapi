@@ -10,6 +10,13 @@
 #include "preferences/usersettings.h"
 
 class QAction;
+class QMenu;
+
+namespace mixxx {
+namespace plugins {
+class PluginMenuRegistry;
+} // namespace plugins
+} // namespace mixxx
 
 class VisibilityControlConnection : public QObject {
     Q_OBJECT
@@ -34,8 +41,11 @@ class VisibilityControlConnection : public QObject {
 class WMainMenuBar : public QMenuBar {
     Q_OBJECT
   public:
-    WMainMenuBar(QWidget* pParent, UserSettingsPointer pConfig,
-                 ConfigObject<ConfigValueKbd>* pKbdConfig);
+    WMainMenuBar(QWidget* pParent,
+            UserSettingsPointer pConfig,
+            ConfigObject<ConfigValueKbd>* pKbdConfig,
+            mixxx::plugins::PluginMenuRegistry* pPluginMenuRegistry);
+    ~WMainMenuBar() override;
 #ifndef __APPLE__
     void hideMenuBar();
     void showMenuBar();
@@ -71,6 +81,7 @@ class WMainMenuBar : public QMenuBar {
     void showAbout();
     void showKeywheel(bool visible);
     void showPreferences();
+    void showPluginsPreferences();
     void toggleDeveloperTools(bool toggle);
     void toggleFullScreen(bool toggle);
     void toggleKeyboardShortcuts(bool toggle);
@@ -112,4 +123,7 @@ class WMainMenuBar : public QMenuBar {
     ConfigObject<ConfigValueKbd>* m_pKbdConfig;
     QList<QAction*> m_loadToDeckActions;
     QList<QAction*> m_vinylControlEnabledActions;
+
+    mixxx::plugins::PluginMenuRegistry* m_pPluginMenuRegistry;
+    QMenu* m_pPluginsMenu;
 };

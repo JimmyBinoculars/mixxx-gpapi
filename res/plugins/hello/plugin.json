@@ -1,0 +1,11 @@
+{
+  "id": "org.mixxx.hello",
+  "name": "Hello Plugin",
+  "description": "Bundled example script plugin. Adds a menu item that reports whether deck 1 is playing.",
+  "author": "Mixxx",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "runtime": "script",
+  "entry": { "script": "main.js" },
+  "capabilities": ["ui.menu", "controls.read", "ui.panel"]
+}
